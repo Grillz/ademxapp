@@ -552,34 +552,34 @@ def _val_impl(args, model_specs, logger):
     logger.info('Done in %.2f s.', time.time() - start)
 
 def run_single(args, model_specs, logger, img_path):
-    print "starting run_single()..."
+    logger.info("starting run_single()...")
     assert args.prefetch_threads == 1
     assert args.weights is not None
 
-    print "parsing args..."
+    logger.info("parsing args...")
     margs = argparse.Namespace(**model_specs)
     dargs = argparse.Namespace(**get_dataset_specs(args, model_specs))
 
-    print "loading args from model..."
+    logger.info("loading args from model...")
     # image_list, label_list = parse_split_file(margs.dataset, args.split)
     _, net_args, net_auxs = util.load_params(args.from_model, args.from_epoch)
     net = None
     mod = _get_module(margs, dargs, net)
 
-    print "asserting crop_sizes..."
+    logger.info("asserting crop_sizes...")
     crop_sizes = sorted([int(_) for _ in args.test_scales.split(',')])[::-1]
     # TODO: multi-scale testing
     assert len(crop_sizes) == 1, 'multi-scale testing not implemented'
     label_stride = margs.feat_stride
     crop_size = crop_sizes[0]
 
-    print "initializing save_dir..."
+    logger.info("initializing save_dir...")
     save_dir = osp.join(args.output, osp.splitext(args.log_file)[0])
     _make_dirs(save_dir)
 
-    x_num = len(image_list)
+    x_num = 1
 
-    print "initializing  transformer..."
+    logger.info("initializing  transformer...")
     do_forward = True
     if do_forward:
         batch = None
@@ -587,25 +587,25 @@ def run_single(args, model_specs, logger, img_path):
         transformers += _get_transformer_post()
         transformer = ts.Compose(transformers)
 
-    print "updating scorer..."
+    logger.info("updating scorer...")
     scorer = ScoreUpdater(dargs.valid_labels, margs.classes, x_num, logger)
     scorer.reset()
     start = time.time()
     done_count = 0
 
 
-    print "creating paths for saving predictions..."
+    logger.info("creating paths for saving predictions...")
     # skip computed images
     if args.save_predictions:
         pred_save_path = osp.join(save_dir, 'predictions', '{}.h5'.format(sample_name))
         if osp.isfile(pred_save_path):
             logger.info('Skipped {} {}/{}'.format(sample_name, i+1, x_num))
 
-    print "loading image..."
+    logger.info("loading image...")
     im_path = img_path
     rim = np.array(Image.open(im_path).convert('RGB'), np.uint8)
 
-    print "do forward..."
+    logger.info("do forward...")
     if do_forward:
         im = transformer(rim)
         imh, imw = im.shape[:2]
@@ -649,14 +649,14 @@ def run_single(args, model_specs, logger, img_path):
                     this_call_preds = 0.5 * (this_call_preds + mod.get_outputs()[0].asnumpy()[0][:, :, ::-1])
                 net_preds[:, iy:iy+pred_h:test_steps, ix:ix+pred_w:test_steps] = this_call_preds
 
-    print "saving predictions..."
+    logger.info("saving predictions...")
     # save predicted probabilities
     if args.save_predictions:
         _make_dirs(osp.dirname(pred_save_path))
         tmp = (rim.shape[:2], net_preds.astype(np.float16), pred_stride, imh, imw)
         util.h5py_save(pred_save_path, *tmp)
 
-    print "saving results..."
+    logger.info("saving results...")
     if args.save_results:
         # compute pixel-wise predictions
         interp_preds = interp_preds_as(rim.shape[:2], net_preds, pred_stride, imh, imw)
@@ -673,7 +673,7 @@ def run_single(args, model_specs, logger, img_path):
     else:
         assert not has_gt
 
-    print "if not has_gt..."
+    logger.info("if not has_gt...")
     done_count += 1
     if not has_gt:
         logger.info('Done {}/{} with speed: {:.2f}/s'.format(i+1, x_num, 1.*done_count / (time.time() - start)))
@@ -681,14 +681,14 @@ def run_single(args, model_specs, logger, img_path):
     label_path = osp.join(args.data_root, label_list[i])
     label = np.array(Image.open(label_path), np.uint8)
 
-    print "saving correctly labeled pixels into an image..."
+    logger.info("saving correctly labeled pixels into an image...")
     # save correctly labeled pixels into an image
     out_path = osp.join(save_dir, 'correct', '{}.png'.format(sample_name))
     _make_dirs(osp.dirname(out_path))
     invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
     Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
 
-    print "updating scorer..."
+    logger.info("updating scorer...")
     scorer.update(pred_label, label, i)
     logger.info('Done in %.2f s.', time.time() - start)
 
