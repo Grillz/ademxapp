@@ -600,7 +600,6 @@ def run_single(args, model_specs, logger, img_path):
         pred_save_path = osp.join(save_dir, 'predictions', '{}.h5'.format(sample_name))
         if osp.isfile(pred_save_path):
             logger.info('Skipped {} {}/{}'.format(sample_name, i+1, x_num))
-            continue
 
     print "loading image..."
     im_path = img_path
