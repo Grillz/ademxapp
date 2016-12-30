@@ -664,8 +664,9 @@ def run_single(args, model_specs, logger, img_path):
         if dargs.id_2_label is not None:
             pred_label = dargs.id_2_label[pred_label]
 
+        sample_name = img_path.split(".")[-1]
         # save predicted labels into an image
-        out_path = osp.join(save_dir, '{}.png'.format(sample_name))
+        out_path = osp.join(save_dir, '{}-segmented.png'.format(sample_name))
         im_to_save = Image.fromarray(pred_label.astype(np.uint8))
         if dargs.cmap is not None:
             im_to_save.putpalette(dargs.cmap.ravel())
