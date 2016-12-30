@@ -664,7 +664,7 @@ def run_single(args, model_specs, logger, img_path):
         if dargs.id_2_label is not None:
             pred_label = dargs.id_2_label[pred_label]
 
-        sample_name = img_path.split(".")[-1]
+        sample_name = img_path.split(".")[-2]
         # save predicted labels into an image
         out_path = osp.join(save_dir, '{}-segmented.png'.format(sample_name))
         im_to_save = Image.fromarray(pred_label.astype(np.uint8))
@@ -689,10 +689,6 @@ def run_single(args, model_specs, logger, img_path):
     invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
     Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
 
-    logger.info("updating scorer...")
-    scorer.update(pred_label, label, i)
-    logger.info('Done in %.2f s.', time.time() - start)
-
 
 if __name__ == "__main__":
     util.cfg['choose_interpolation_method'] = True
@@ -707,7 +703,7 @@ if __name__ == "__main__":
     logger.info('and model specs %s', model_specs)
 
     print "running single"
-    img_path = "./10101412992358883.jpg"
+    img_path = "./745033769293.jpg"
     print "running img_path: " + str(img_path)
     run_single(args, model_specs, logger, img_path)
 #    if args.phase == 'train':
