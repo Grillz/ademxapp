@@ -677,7 +677,6 @@ def run_single(args, model_specs, logger, img_path):
     done_count += 1
     if not has_gt:
         logger.info('Done {}/{} with speed: {:.2f}/s'.format(i+1, x_num, 1.*done_count / (time.time() - start)))
-        continue
 
     label_path = osp.join(args.data_root, label_list[i])
     label = np.array(Image.open(label_path), np.uint8)
