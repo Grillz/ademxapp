@@ -92,16 +92,16 @@ def parse_args():
     parser.add_argument('--test-scales', dest='test_scales',
                         help='Lengths of the longer side to resize an image into, e.g., 224,256.',
                         default=None, type=str)
-    parser.add_argument('--test-flipping', dest='test_flipping', 
+    parser.add_argument('--test-flipping', dest='test_flipping',
                         help='If average predictions of original and flipped images.',
                         default=False, action='store_true')
     parser.add_argument('--test-steps', dest='test_steps',
                         help='The number of steps to take, for predictions at a higher resolution.',
                         default=1, type=int)
-    parser.add_argument('--save-predictions', dest='save_predictions', 
+    parser.add_argument('--save-predictions', dest='save_predictions',
                         help='If save the predicted score maps.',
                         default=False, action='store_true')
-    parser.add_argument('--no-save-results', dest='save_results', 
+    parser.add_argument('--no-save-results', dest='save_results',
                         help='If save the predicted pixel-wise labels.',
                         default=True, action='store_false')
     #
@@ -114,7 +114,7 @@ def parse_args():
     parser.add_argument('--prefetcher', dest='prefetcher',
                         help='The type of prefetercher, e.g., process/thread.',
                         default='thread', type=str)
-    parser.add_argument('--cache-images', dest='cache_images', 
+    parser.add_argument('--cache-images', dest='cache_images',
                         help='If cache images, e.g., 0/1',
                         default=None, type=int)
     parser.add_argument('--log-file', dest='log_file',
@@ -131,7 +131,7 @@ def parse_args():
     parser.add_argument('--backward-do-mirror', dest='backward_do_mirror',
                         help='True means less gpu memory usage.',
                         default=False, action='store_true')
-    
+
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
@@ -142,13 +142,13 @@ def parse_args():
 
     if args.backward_do_mirror:
         os.environ['MXNET_BACKWARD_DO_MIRROR'] = '1'
-    
+
     if args.output is None:
         if args.phase == 'val':
             args.output = osp.dirname(args.weights)
         else:
             args.output = '../output'
-    
+
     if args.weights is not None:
         #
         if args.model is None:
@@ -160,10 +160,10 @@ def parse_args():
             parts = osp.splitext(osp.basename(args.weights))[0].split('-')
             args.from_model = osp.join(osp.dirname(args.weights), '-'.join(parts[:-1]))
             args.from_epoch = int(parts[-1])
-    
+
     if args.from_epoch is None:
         args.from_epoch = 0
-    
+
     if args.log_file is None:
         if args.phase == 'train':
             args.log_file = '{}.log'.format(args.model)
@@ -174,11 +174,11 @@ def parse_args():
             args.log_file = '{}{}.log'.format(osp.splitext(osp.basename(args.weights))[0], suffix)
         else:
             raise NotImplementedError('Unknown phase: {}'.format(args.phase))
-    
+
     model_specs = parse_model_label(args)
     if args.data_root is None:
         args.data_root = osp.join('../data', model_specs['dataset'])
-    
+
     return args, model_specs
 
 
@@ -189,7 +189,7 @@ def get_dataset_specs(args, model_specs):
     if osp.isfile(meta_path):
         with open(meta_path) as f:
             meta = cPickle.load(f)
-    
+
     label_2_id = None
     id_2_label = None
     cmap = None
@@ -210,7 +210,7 @@ def get_dataset_specs(args, model_specs):
         #
         max_shape = np.array((2100, 2100))
         if model_specs.get('balanced', False) and args.split == 'trainval':
-            meta['image_classes']['trainval'] = meta['image_classes']['train'] + meta['image_classes']['val']    
+            meta['image_classes']['trainval'] = meta['image_classes']['train'] + meta['image_classes']['val']
     elif dataset == 'cityscapes':
         sys.path.insert(0, '../cityscapesScripts/cityscapesscripts/helpers')
         from labels import id2label, trainId2label
@@ -266,12 +266,12 @@ def get_dataset_specs(args, model_specs):
             max_shape = np.array((500, 500))
     else:
         raise NotImplementedError('Unknow dataset: {}'.format(dataset))
-    
+
     if cmap is None and cmap_path is not None:
         if osp.isfile(cmap_path):
             with open(cmap_path) as f:
                 cmap = cPickle.load(f)
-    
+
     meta['label_2_id'] = label_2_id
     meta['id_2_label'] = id_2_label
     meta['valid_labels'] = valid_labels
@@ -348,52 +348,52 @@ def interp_preds_as(im_size, net_preds, pred_stride, imh, imw, threads=4):
 class ScoreUpdater(object):
     def __init__(self, valid_labels, c_num, x_num, logger=None, label=None, info=None):
         self._valid_labels = valid_labels
-        
+
         self._confs = np.zeros((c_num, c_num, x_num))
         self._pixels = np.zeros((c_num, x_num))
         self._logger = logger
         self._label = label
         self._info = info
-        
+
     @property
     def info(self):
         return self._info
-    
+
     def reset(self):
         self._start = time.time()
         self._computed = np.zeros((self._pixels.shape[1],))
         self._confs[:] = 0
         self._pixels[:] = 0
-    
+
     @staticmethod
     def calc_updates(valid_labels, pred_label, label):
         num_classes = len(valid_labels)
-        
+
         pred_flags = [set(np.where((pred_label == _).ravel())[0]) for _ in valid_labels]
         class_flags = [set(np.where((label == _).ravel())[0]) for _ in valid_labels]
-        
+
         conf = [len(class_flags[j].intersection(pred_flags[k])) for j in xrange(num_classes) for k in xrange(num_classes)]
         pixel = [len(class_flags[j]) for j in xrange(num_classes)]
         return np.single(conf).reshape((num_classes, num_classes)), np.single(pixel)
-    
+
     def do_updates(self, conf, pixel, i, computed=True):
         if computed:
             self._computed[i] = 1
         self._confs[:, :, i] = conf
         self._pixels[:, i] = pixel
-    
+
     def update(self, pred_label, label, i, computed=True):
         conf, pixel = ScoreUpdater.calc_updates(self._valid_labels, pred_label, label)
         self.do_updates(conf, pixel, i, computed)
         self.scores(i)
-        
+
     def scores(self, i=None, logger=None):
         confs = self._confs
         pixels = self._pixels
-        
+
         num_classes = pixels.shape[0]
         x_num = pixels.shape[1]
-        
+
         class_pixels = pixels.sum(1)
         class_pixels += class_pixels == 0
         scores = confs[xrange(num_classes), xrange(num_classes), :].sum(1)
@@ -401,7 +401,7 @@ class ScoreUpdater(object):
         cls_accs = scores / class_pixels
         class_preds = confs.sum(0).sum(1)
         ious = scores / (class_pixels + class_preds - scores)
-        
+
         logger = self._logger if logger is None else logger
         if logger is not None:
             if i is not None:
@@ -413,9 +413,9 @@ class ScoreUpdater(object):
             with util.np_print_options(formatter={'float': '{:5.2f}'.format}):
                 logger.info('\n{}'.format(cls_accs*100))
                 logger.info('\n{}'.format(ious*100))
-        
+
         return acc, cls_accs, ious
-    
+
     def overall_scores(self, logger=None):
         acc, cls_accs, ious = self.scores(None, logger)
         return acc, cls_accs.mean(), ious.mean()
@@ -424,55 +424,55 @@ class ScoreUpdater(object):
 def _val_impl(args, model_specs, logger):
     assert args.prefetch_threads == 1
     assert args.weights is not None
-    
+
     margs = argparse.Namespace(**model_specs)
     dargs = argparse.Namespace(**get_dataset_specs(args, model_specs))
-    
+
     image_list, label_list = parse_split_file(margs.dataset, args.split)
     _, net_args, net_auxs = util.load_params(args.from_model, args.from_epoch)
     net = None
     mod = _get_module(margs, dargs, net)
     has_gt = args.split in ('train', 'val',)
-    
+
     crop_sizes = sorted([int(_) for _ in args.test_scales.split(',')])[::-1]
     # TODO: multi-scale testing
     assert len(crop_sizes) == 1, 'multi-scale testing not implemented'
     label_stride = margs.feat_stride
     crop_size = crop_sizes[0]
-    
+
     save_dir = osp.join(args.output, osp.splitext(args.log_file)[0])
     _make_dirs(save_dir)
-    
+
     x_num = len(image_list)
-    
+
     do_forward = True
     if do_forward:
         batch = None
         transformers = [ts.Scale(crop_size, Image.CUBIC, False)]
         transformers += _get_transformer_post()
         transformer = ts.Compose(transformers)
-    
+
     scorer = ScoreUpdater(dargs.valid_labels, margs.classes, x_num, logger)
     scorer.reset()
     start = time.time()
     done_count = 0
     for i in xrange(x_num):
         sample_name = osp.splitext(osp.basename(image_list[i]))[0]
-        
+
         # skip computed images
         if args.save_predictions:
             pred_save_path = osp.join(save_dir, 'predictions', '{}.h5'.format(sample_name))
             if osp.isfile(pred_save_path):
                 logger.info('Skipped {} {}/{}'.format(sample_name, i+1, x_num))
                 continue
-            
+
         im_path = osp.join(args.data_root, image_list[i])
         rim = np.array(Image.open(im_path).convert('RGB'), np.uint8)
-        
+
         if do_forward:
             im = transformer(rim)
             imh, imw = im.shape[:2]
-            
+
             # init
             if batch is None:
                 if dargs.ident_size:
@@ -484,7 +484,7 @@ def _val_impl(args, model_specs, logger):
                 test_steps = args.test_steps
                 pred_stride = label_stride / test_steps
                 pred_h, pred_w = label_h * test_steps, label_w * test_steps
-        
+
                 input_data = np.zeros((1, 3, input_h, input_w), np.single)
                 input_label = 255 * np.ones((1, label_h * label_w), np.single)
                 dataiter = mx.io.NDArrayIter(input_data, input_label)
@@ -492,11 +492,11 @@ def _val_impl(args, model_specs, logger):
                 mod.bind(dataiter.provide_data, dataiter.provide_label, for_training=False, force_rebind=True)
                 if not mod.params_initialized:
                     mod.init_params(arg_params=net_args, aux_params=net_auxs)
-            
+
             nim = np.zeros((3, imh+label_stride, imw+label_stride), np.single)
             sy = sx = label_stride // 2
             nim[:, sy:sy+imh, sx:sx+imw] = im.transpose(2, 0, 1)
-            
+
             net_preds = np.zeros((margs.classes, pred_h, pred_w), np.single)
             sy = sx = pred_stride // 2 + np.arange(test_steps) * pred_stride
             for ix in xrange(test_steps):
@@ -517,14 +517,14 @@ def _val_impl(args, model_specs, logger):
             _make_dirs(osp.dirname(pred_save_path))
             tmp = (rim.shape[:2], net_preds.astype(np.float16), pred_stride, imh, imw)
             util.h5py_save(pred_save_path, *tmp)
-        
+
         if args.save_results:
             # compute pixel-wise predictions
             interp_preds = interp_preds_as(rim.shape[:2], net_preds, pred_stride, imh, imw)
             pred_label = interp_preds.argmax(0)
             if dargs.id_2_label is not None:
                 pred_label = dargs.id_2_label[pred_label]
-            
+
             # save predicted labels into an image
             out_path = osp.join(save_dir, '{}.png'.format(sample_name))
             im_to_save = Image.fromarray(pred_label.astype(np.uint8))
@@ -533,41 +533,188 @@ def _val_impl(args, model_specs, logger):
             im_to_save.save(out_path)
         else:
             assert not has_gt
-        
+
         done_count += 1
         if not has_gt:
             logger.info('Done {}/{} with speed: {:.2f}/s'.format(i+1, x_num, 1.*done_count / (time.time() - start)))
             continue
-        
+
         label_path = osp.join(args.data_root, label_list[i])
         label = np.array(Image.open(label_path), np.uint8)
-        
+
         # save correctly labeled pixels into an image
         out_path = osp.join(save_dir, 'correct', '{}.png'.format(sample_name))
         _make_dirs(osp.dirname(out_path))
         invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
         Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
-        
+
         scorer.update(pred_label, label, i)
     logger.info('Done in %.2f s.', time.time() - start)
 
+def run_single(args, model_specs, logger, img_path):
+    print "starting run_single()..."
+    assert args.prefetch_threads == 1
+    assert args.weights is not None
+
+    print "parsing args..."
+    margs = argparse.Namespace(**model_specs)
+    dargs = argparse.Namespace(**get_dataset_specs(args, model_specs))
+
+    print "loading args from model..."
+    # image_list, label_list = parse_split_file(margs.dataset, args.split)
+    _, net_args, net_auxs = util.load_params(args.from_model, args.from_epoch)
+    net = None
+    mod = _get_module(margs, dargs, net)
+
+    print "asserting crop_sizes..."
+    crop_sizes = sorted([int(_) for _ in args.test_scales.split(',')])[::-1]
+    # TODO: multi-scale testing
+    assert len(crop_sizes) == 1, 'multi-scale testing not implemented'
+    label_stride = margs.feat_stride
+    crop_size = crop_sizes[0]
+
+    print "initializing save_dir..."
+    save_dir = osp.join(args.output, osp.splitext(args.log_file)[0])
+    _make_dirs(save_dir)
+
+    x_num = len(image_list)
+
+    print "initializing  transformer..."
+    do_forward = True
+    if do_forward:
+        batch = None
+        transformers = [ts.Scale(crop_size, Image.CUBIC, False)]
+        transformers += _get_transformer_post()
+        transformer = ts.Compose(transformers)
+
+    print "updating scorer..."
+    scorer = ScoreUpdater(dargs.valid_labels, margs.classes, x_num, logger)
+    scorer.reset()
+    start = time.time()
+    done_count = 0
+
+
+    print "creating paths for saving predictions..."
+    # skip computed images
+    if args.save_predictions:
+        pred_save_path = osp.join(save_dir, 'predictions', '{}.h5'.format(sample_name))
+        if osp.isfile(pred_save_path):
+            logger.info('Skipped {} {}/{}'.format(sample_name, i+1, x_num))
+            continue
+
+    print "loading image..."
+    im_path = img_path
+    rim = np.array(Image.open(im_path).convert('RGB'), np.uint8)
+
+    print "do forward..."
+    if do_forward:
+        im = transformer(rim)
+        imh, imw = im.shape[:2]
+
+        # init
+        if batch is None:
+            if dargs.ident_size:
+                input_h = make_divisible(imh, margs.feat_stride)
+                input_w = make_divisible(imw, margs.feat_stride)
+            else:
+                input_h = input_w = make_divisible(crop_size, margs.feat_stride)
+            label_h, label_w = input_h / label_stride, input_w / label_stride
+            test_steps = args.test_steps
+            pred_stride = label_stride / test_steps
+            pred_h, pred_w = label_h * test_steps, label_w * test_steps
+
+            input_data = np.zeros((1, 3, input_h, input_w), np.single)
+            input_label = 255 * np.ones((1, label_h * label_w), np.single)
+            dataiter = mx.io.NDArrayIter(input_data, input_label)
+            batch = dataiter.next()
+            mod.bind(dataiter.provide_data, dataiter.provide_label, for_training=False, force_rebind=True)
+            if not mod.params_initialized:
+                mod.init_params(arg_params=net_args, aux_params=net_auxs)
+
+        nim = np.zeros((3, imh+label_stride, imw+label_stride), np.single)
+        sy = sx = label_stride // 2
+        nim[:, sy:sy+imh, sx:sx+imw] = im.transpose(2, 0, 1)
+
+        net_preds = np.zeros((margs.classes, pred_h, pred_w), np.single)
+        sy = sx = pred_stride // 2 + np.arange(test_steps) * pred_stride
+        for ix in xrange(test_steps):
+            for iy in xrange(test_steps):
+                input_data = np.zeros((1, 3, input_h, input_w), np.single)
+                input_data[0, :, :imh, :imw] = nim[:, sy[iy]:sy[iy]+imh, sx[ix]:sx[ix]+imw]
+                batch.data[0] = mx.nd.array(input_data)
+                mod.forward(batch, is_train=False)
+                this_call_preds = mod.get_outputs()[0].asnumpy()[0]
+                if args.test_flipping:
+                    batch.data[0] = mx.nd.array(input_data[:, :, :, ::-1])
+                    mod.forward(batch, is_train=False)
+                    this_call_preds = 0.5 * (this_call_preds + mod.get_outputs()[0].asnumpy()[0][:, :, ::-1])
+                net_preds[:, iy:iy+pred_h:test_steps, ix:ix+pred_w:test_steps] = this_call_preds
+
+    print "saving predictions..."
+    # save predicted probabilities
+    if args.save_predictions:
+        _make_dirs(osp.dirname(pred_save_path))
+        tmp = (rim.shape[:2], net_preds.astype(np.float16), pred_stride, imh, imw)
+        util.h5py_save(pred_save_path, *tmp)
+
+    print "saving results..."
+    if args.save_results:
+        # compute pixel-wise predictions
+        interp_preds = interp_preds_as(rim.shape[:2], net_preds, pred_stride, imh, imw)
+        pred_label = interp_preds.argmax(0)
+        if dargs.id_2_label is not None:
+            pred_label = dargs.id_2_label[pred_label]
+
+        # save predicted labels into an image
+        out_path = osp.join(save_dir, '{}.png'.format(sample_name))
+        im_to_save = Image.fromarray(pred_label.astype(np.uint8))
+        if dargs.cmap is not None:
+            im_to_save.putpalette(dargs.cmap.ravel())
+        im_to_save.save(out_path)
+    else:
+        assert not has_gt
+
+    print "if not has_gt..."
+    done_count += 1
+    if not has_gt:
+        logger.info('Done {}/{} with speed: {:.2f}/s'.format(i+1, x_num, 1.*done_count / (time.time() - start)))
+        continue
+
+    label_path = osp.join(args.data_root, label_list[i])
+    label = np.array(Image.open(label_path), np.uint8)
+
+    print "saving correctly labeled pixels into an image..."
+    # save correctly labeled pixels into an image
+    out_path = osp.join(save_dir, 'correct', '{}.png'.format(sample_name))
+    _make_dirs(osp.dirname(out_path))
+    invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
+    Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
+
+    print "updating scorer..."
+    scorer.update(pred_label, label, i)
+    logger.info('Done in %.2f s.', time.time() - start)
+
+
 if __name__ == "__main__":
     util.cfg['choose_interpolation_method'] = True
-    
+
     args, model_specs = parse_args()
-    
+
     if len(args.output) > 0:
         _make_dirs(args.output)
-    
+
     logger = util.set_logger(args.output, args.log_file, args.debug)
     logger.info('start with arguments %s', args)
     logger.info('and model specs %s', model_specs)
-    
-    if args.phase == 'train':
-        NotImplementedError('Unknown phase: {}'.format(args.phase))
-        #_train_impl(args, model_specs, logger)
-    elif args.phase == 'val':
-        _val_impl(args, model_specs, logger)
-    else:
-        raise NotImplementedError('Unknown phase: {}'.format(args.phase))
 
+    print "running single"
+    img_path = "./10101412992358883.jpg"
+    print "running img_path: " + str(img_path)
+    run_single(args, model_specs, logger, img_path)
+#    if args.phase == 'train':
+#        NotImplementedError('Unknown phase: {}'.format(args.phase))
+#        #_train_impl(args, model_specs, logger)
+#    elif args.phase == 'val':
+#        _val_impl(args, model_specs, logger)
+#    else:
+#        raise NotImplementedError('Unknown phase: {}'.format(args.phase))
