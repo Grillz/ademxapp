@@ -670,8 +670,9 @@ def run_single(args, model_specs, logger, img_path):
         logger.info("interp_preds: ")
         logger.info(interp_preds)
         logger.info("interating interp_preds: ")
-        for x in np.nditer(interp_preds):
-            print x
+
+        #for x in np.nditer(interp_preds):
+        #    print x
         pred_label = interp_preds.argmax(0)
         logger.info("pred label: ")
         logger.info(pred_label)
