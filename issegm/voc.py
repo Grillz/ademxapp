@@ -612,6 +612,7 @@ def run_single(args, model_specs, logger, img_path):
 
         # init
         if batch is None:
+            logger.info("batch is none")
             if dargs.ident_size:
                 input_h = make_divisible(imh, margs.feat_stride)
                 input_w = make_divisible(imw, margs.feat_stride)
@@ -630,12 +631,16 @@ def run_single(args, model_specs, logger, img_path):
             if not mod.params_initialized:
                 mod.init_params(arg_params=net_args, aux_params=net_auxs)
 
+        logger.info("batch not none")
+
         nim = np.zeros((3, imh+label_stride, imw+label_stride), np.single)
         sy = sx = label_stride // 2
         nim[:, sy:sy+imh, sx:sx+imw] = im.transpose(2, 0, 1)
 
         net_preds = np.zeros((margs.classes, pred_h, pred_w), np.single)
         sy = sx = pred_stride // 2 + np.arange(test_steps) * pred_stride
+        logger.info("test steps")
+        logger.info(test_steps)
         for ix in xrange(test_steps):
             for iy in xrange(test_steps):
                 input_data = np.zeros((1, 3, input_h, input_w), np.single)
@@ -664,12 +669,20 @@ def run_single(args, model_specs, logger, img_path):
         interp_preds = interp_preds_as(rim.shape[:2], net_preds, pred_stride, imh, imw)
         logger.info("interp_preds: ")
         logger.info(interp_preds)
+        logger.info("interating interp_preds: ")
+        for x in np.nditer(interp_preds):
+            print x
         pred_label = interp_preds.argmax(0)
         logger.info("pred label: ")
         logger.info(pred_label)
         if dargs.id_2_label is not None:
-            print "not none: "
+            logger.info("not none: ")
             pred_label = dargs.id_2_label[pred_label]
+            logger.info(pred_label)
+
+        logger.info("iterating pred label: ")
+        for x in np.nditer(pred_label):
+            print x
 
         sample_nm = img_path.split(".")[-2]
         sample_name = sample_nm.split("/")[-1]
@@ -687,15 +700,15 @@ def run_single(args, model_specs, logger, img_path):
     #if not has_gt:
     #    logger.info('Done {}/{} with speed: {:.2f}/s'.format(i+1, x_num, 1.*done_count / (time.time() - start)))
 
-    label_path = osp.join(args.data_root, label_list[i])
-    label = np.array(Image.open(label_path), np.uint8)
+    #label_path = osp.join(args.data_root, label_list[i])
+    #label = np.array(Image.open(label_path), np.uint8)
 
-    logger.info("saving correctly labeled pixels into an image...")
+    #logger.info("saving correctly labeled pixels into an image...")
     # save correctly labeled pixels into an image
-    out_path = osp.join(save_dir, 'correct', '{}.png'.format(sample_name))
-    _make_dirs(osp.dirname(out_path))
-    invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
-    Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
+    #out_path = osp.join(save_dir, 'correct', '{}.png'.format(sample_name))
+    #_make_dirs(osp.dirname(out_path))
+    #invalid_mask = np.logical_not(np.in1d(label, dargs.valid_labels)).reshape(label.shape)
+    #Image.fromarray((invalid_mask*255 + (label == pred_label)*127).astype(np.uint8)).save(out_path)
 
 
 if __name__ == "__main__":
