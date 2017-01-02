@@ -659,9 +659,16 @@ def run_single(args, model_specs, logger, img_path):
     logger.info("saving results...")
     if args.save_results:
         # compute pixel-wise predictions
+        logger.info("net preds: ")
+        logger.info(net_preds)
         interp_preds = interp_preds_as(rim.shape[:2], net_preds, pred_stride, imh, imw)
+        logger.info("interp_preds: ")
+        logger.info(interp_preds)
         pred_label = interp_preds.argmax(0)
+        logger.info("pred label: ")
+        logger.info(pred_label)
         if dargs.id_2_label is not None:
+            print "not none: "
             pred_label = dargs.id_2_label[pred_label]
 
         sample_nm = img_path.split(".")[-2]
