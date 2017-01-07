@@ -631,7 +631,6 @@ def run_single(args, model_specs, logger, img_path):
             if not mod.params_initialized:
                 mod.init_params(arg_params=net_args, aux_params=net_auxs)
 
-        logger.info("batch not none")
 
         nim = np.zeros((3, imh+label_stride, imw+label_stride), np.single)
         sy = sx = label_stride // 2
@@ -688,11 +687,15 @@ def run_single(args, model_specs, logger, img_path):
         sample_nm = img_path.split(".")[-2]
         sample_name = sample_nm.split("/")[-1]
         # save predicted labels into an image
+        logger.info("saving image...")
         out_path = osp.join(save_dir, '{}-segmented.png'.format(sample_name))
         im_to_save = Image.fromarray(pred_label.astype(np.uint8))
+        logger.info("image to save: ")
+        logger.info(im_to_save)
         if dargs.cmap is not None:
             im_to_save.putpalette(dargs.cmap.ravel())
         im_to_save.save(out_path)
+        logger.info("image saved")
     else:
         assert not has_gt
 
